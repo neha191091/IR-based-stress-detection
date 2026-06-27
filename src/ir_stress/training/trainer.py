@@ -13,19 +13,12 @@ from tqdm import tqdm
 
 from ir_stress.config import TrainConfig, resolve_h5_dir
 from ir_stress.data.dataset import H5ClipDataset
+from ir_stress.device import device_label, resolve_device, supports_amp
 from ir_stress.data.splits import resolve_h5_splits, save_split_metadata
 from ir_stress.models.model import RppgModel, build_model
 from ir_stress.tracking import ensure_mlflow
 from ir_stress.training.ipr import IrrelevantPowerRatio
 from ir_stress.training.loss import ContrastLoss
-
-
-def _device() -> torch.device:
-    if torch.cuda.is_available():
-        torch.backends.cudnn.enabled = True
-        torch.backends.cudnn.benchmark = True
-        return torch.device("cuda")
-    return torch.device("cpu")
 
 
 def _forward_model(model: RppgModel, imgs: torch.Tensor, micro_batch: bool) -> torch.Tensor:
@@ -49,8 +42,9 @@ def train(
     if train_list is None or test_list is None:
         train_list, test_list = resolve_h5_splits(config)
 
-    device = _device()
-    use_amp = config.use_amp and device.type == "cuda"
+    device = resolve_device(config.device)
+    use_amp = config.use_amp and supports_amp(device)
+    print(f"Training on {device_label(device)} (AMP={'on' if use_amp else 'off'})", flush=True)
     run_dir = Path(
         os.path.join(
             config.checkpoint_dir,
@@ -82,6 +76,7 @@ def train(
                 "use_amp": use_amp,
                 "grad_checkpoint": config.grad_checkpoint,
                 "micro_batch": config.micro_batch,
+                "device": device_label(device),
             }
         )
 

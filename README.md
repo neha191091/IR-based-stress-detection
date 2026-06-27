@@ -173,7 +173,38 @@ uv run scripts/train.py 'val_subjects=[11]' 'wavelengths=[940]'
 
 On bash, quoting is optional but still fine.
 
-### 3. Fast dev run (CPU / low memory)
+### 3. GPU training
+
+Training uses CUDA automatically when PyTorch sees a GPU (`device=null`, the default). Mixed precision (AMP) is enabled by default on CUDA (`use_amp=true`).
+
+Verify your environment:
+
+```bash
+uv run python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+```
+
+If `cuda` is `False` but you have an NVIDIA GPU, reinstall PyTorch with a CUDA wheel (pick the index that matches your driver/CUDA toolkit from [pytorch.org](https://pytorch.org/get-started/locally/)):
+
+```bash
+uv pip install torch --index-url https://download.pytorch.org/whl/cu124
+```
+
+Example GPU run with a larger batch and DataLoader workers:
+
+```bash
+uv run scripts/train.py \
+  'val_subjects=[11]' \
+  device=cuda \
+  num_workers=4 \
+  batch_size=2 \
+  epochs=30
+```
+
+Force CPU (e.g. for debugging): `device=cpu use_amp=false`.
+
+Select a specific GPU: `device=cuda:1`.
+
+### 4. Fast dev run (CPU / low memory)
 
 Training is CPU-heavy and memory-intensive with full paper settings (~128×128, 10 s clips). For quick iteration, lower resolution and shorter clips — no re-preprocess required (`face_size` resizes on load):
 
@@ -188,7 +219,7 @@ uv run scripts/train.py \
 
 Run long jobs in an **external terminal** (not the IDE integrated terminal) to avoid OOM kills when RAM is tight.
 
-### 4. Paper-faithful settings (Contrast-Phys+ MR-NIRP)
+### 5. Paper-faithful settings (Contrast-Phys+ MR-NIRP)
 
 Unsupervised (0% labels), matching the Contrast-Phys+ paper defaults:
 
@@ -211,7 +242,7 @@ uv run scripts/train.py \
 
 Weakly-supervised variants from the paper: `label_ratio=0.2`, `0.6`, or `1.0`.
 
-### 5. Monitor and evaluate
+### 6. Monitor and evaluate
 
 Checkpoints (`epoch0.pt`, …), `config.json`, and `split.json` are saved to `checkpoint_dir/` (default `checkpoints/`). Metrics (`loss`, `p_loss`, `n_loss`, `ipr`, …) are logged to `mlflow.db` (SQLite).
 
@@ -248,7 +279,9 @@ Defaults live in `ir_stress.config.Config` (overridden via Hydra in `scripts/tra
 | `eval_window_sec` | `30` | Evaluation/inference window length |
 | `val_subjects` | `[1]` | Held-out subject IDs (leave-one-out) |
 | `wavelengths` | `[940]` | Clip bands to include |
-| `num_workers` | `0` | DataLoader workers (0 recommended on CPU) |
+| `num_workers` | `0` | DataLoader workers (use 2–4 on GPU) |
+| `device` | `null` (auto) | `cuda`, `cuda:N`, `cpu`, or `mps` |
+| `use_amp` | `true` | Mixed precision on CUDA (set `false` on CPU) |
 | `h5_dir` | `data/h5` | Preprocessed H5 directory |
 | `checkpoint_dir` | `checkpoints` | Output directory for weights and run metadata |
 | `mlflow_experiment` | `ir-stress-rppg` | MLflow experiment name |
@@ -267,7 +300,7 @@ Use the same `face_size` at train and eval. Checkpoints trained at `face_size=64
 - `batch_size` cannot be reduced below 2 without changing the loss.
 - Preprocessing writes one frame at a time to H5. Training loads random temporal windows from disk.
 - Evaluation and inference read video windows rather than loading full clips.
-- On machines without a GPU, expect hours for a full 30-epoch run at paper settings.
+- On machines without a GPU, expect hours for a full 30-epoch run at paper settings. With a CUDA GPU, training is typically much faster; `use_amp=true` reduces VRAM use.
 
 ## Evaluation
 

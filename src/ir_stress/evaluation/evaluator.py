@@ -8,15 +8,12 @@ import pandas as pd
 import torch
 
 from ir_stress.config import TrainConfig
+from ir_stress.device import resolve_device
 from ir_stress.data.base import h5_num_frames, read_h5_window
 from ir_stress.models.model import build_model
 from ir_stress.models.predict import predict_window
 from ir_stress.signals.metrics import mse, pearson_r
 from ir_stress.tracking import ensure_mlflow
-
-
-def _device() -> torch.device:
-    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def evaluate(config: TrainConfig, checkpoint: Path, test_list: list[str]) -> dict[str, float]:
@@ -25,7 +22,7 @@ def evaluate(config: TrainConfig, checkpoint: Path, test_list: list[str]) -> dic
 
     Reads each eval window from disk individually to limit memory use.
     """
-    device = _device()
+    device = resolve_device(config.device)
     model = build_model(config.model, spatial_dim=config.spatial_dim, in_ch=config.in_ch)
     model.load_state_dict(torch.load(checkpoint, map_location=device))
     model = model.to(device).eval()

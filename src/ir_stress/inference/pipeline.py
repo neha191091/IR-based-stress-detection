@@ -7,16 +7,13 @@ import numpy as np
 import torch
 
 from ir_stress.config import InferenceConfig, TrainConfig
+from ir_stress.device import resolve_device
 from ir_stress.data.base import h5_num_frames, iter_h5_imgs_windows
 from ir_stress.data.face_crop import FaceCropStream, annotate_bbox, stack_face_window
 from ir_stress.models.model import build_model, RppgModel
 from ir_stress.models.predict import predict_window
 from ir_stress.signals.filtering import butter_bandpass
 from ir_stress.signals.stress_indicators import baevsky_stress_index, extract_ibi
-
-
-def _device() -> torch.device:
-    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def _load_model(
@@ -121,7 +118,7 @@ def run_inference(
             "Provide exactly one input mode: --input-h5 OR (--input-dir AND --landmarks-csv)."
         )
 
-    device = _device()
+    device = resolve_device(getattr(config, "device", None))
     model = _load_model(config, checkpoint, device)
 
     if input_h5 is not None:

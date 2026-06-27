@@ -44,6 +44,7 @@ class ModelConfig:
     spatial_dim: int = 2
     face_size: int = 128
     eval_window_sec: int = 30
+    device: str | None = None
 
 
 @dataclass
