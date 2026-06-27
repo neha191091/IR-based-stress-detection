@@ -9,7 +9,7 @@ import torch
 
 from ir_stress.config import TrainConfig
 from ir_stress.device import resolve_device
-from ir_stress.data.base import h5_num_frames, read_h5_window
+from ir_stress.dataset.base import h5_num_frames, read_h5_window
 from ir_stress.models.model import build_model
 from ir_stress.models.predict import predict_window
 from ir_stress.signals.metrics import mse, pearson_r

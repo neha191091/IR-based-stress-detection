@@ -12,8 +12,8 @@ from hydra.core.config_store import ConfigStore
 from matplotlib.gridspec import GridSpec
 from scipy.io import loadmat
 
-from ir_stress.data.face_crop import annotate_bbox, face_bbox_corners, load_landmarks, read_nir_pair
-from ir_stress.data.mr_nirp_driving import MRNIRPDrivingAdapter
+from ir_stress.dataset.face_crop import annotate_bbox, face_bbox_corners, load_landmarks, read_nir_pair
+from ir_stress.dataset.mr_nirp_driving import MRNIRPDrivingAdapter
 from ir_stress.signals.stress_indicators import extract_ibi_with_beat_times, stress_indicators
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent

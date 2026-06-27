@@ -4,7 +4,7 @@ import hydra
 from hydra.core.config_store import ConfigStore
 
 from ir_stress.config import TrainConfig, resolve_config
-from ir_stress.data.splits import resolve_h5_splits
+from ir_stress.dataset.splits import resolve_h5_splits
 from ir_stress.training.trainer import train
 
 

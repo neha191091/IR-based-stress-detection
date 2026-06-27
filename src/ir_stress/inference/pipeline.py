@@ -8,8 +8,8 @@ import torch
 
 from ir_stress.config import InferenceConfig, TrainConfig
 from ir_stress.device import resolve_device
-from ir_stress.data.base import h5_num_frames, iter_h5_imgs_windows
-from ir_stress.data.face_crop import FaceCropStream, annotate_bbox, stack_face_window
+from ir_stress.dataset.base import h5_num_frames, iter_h5_imgs_windows
+from ir_stress.dataset.face_crop import FaceCropStream, annotate_bbox, stack_face_window
 from ir_stress.models.model import build_model, RppgModel
 from ir_stress.models.predict import predict_window
 from ir_stress.signals.filtering import butter_bandpass

@@ -6,7 +6,7 @@ import hydra
 from hydra.core.config_store import ConfigStore
 
 from ir_stress.config import EvaluateConfig
-from ir_stress.data.splits import load_config_from_run_dir, resolve_test_paths
+from ir_stress.dataset.splits import load_config_from_run_dir, resolve_test_paths
 from ir_stress.evaluation.evaluator import evaluate
 
 

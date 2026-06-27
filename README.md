@@ -12,8 +12,8 @@ NIR video  →  Backbone (PhysNet)  →  ST-rPPG head  →  rPPG signal  →  IB
 
 | Pipeline | Module | Metrics |
 |----------|--------|---------|
-| Download | `ir_stress.data.mr_nirp_download` | — |
-| Preprocess | `ir_stress.data.mr_nirp_driving` | — |
+| Download | `ir_stress.dataset.mr_nirp_download` | — |
+| Preprocess | `ir_stress.dataset.mr_nirp_driving` | — |
 | Train | `ir_stress.training` | MLflow: loss, IPR |
 | Evaluate | `ir_stress.evaluation` | Pearson r, MSE |
 | Inference | `ir_stress.inference` | rPPG, Baevsky SI, HRV |
@@ -399,7 +399,7 @@ notebooks/
 
 src/ir_stress/
   models/       Backbone, STRppgHead, PhysNet, RppgModel
-  data/         adapters, face_crop, mr_nirp_download, H5 dataset, synthetic
+  dataset/    adapters, face_crop, mr_nirp_download, H5 clips, synthetic
   training/     ContrastLoss, trainer
   evaluation/   Pearson/MSE evaluator
   inference/    rPPG + stress index pipeline
@@ -408,7 +408,7 @@ src/ir_stress/
 
 ## Extending
 
-**New dataset** — implement `DatasetAdapter` in `src/ir_stress/data/` (see `physdrive.py` stub).
+**New dataset** — implement `DatasetAdapter` in `src/ir_stress/dataset/` (see `physdrive.py` stub).
 
 **New backbone** — subclass `Backbone`, implement `encode()`, register in `build_model()` in `models/model.py` (see `lejepa.py` stub). The shared `STRppgHead` attaches to the backbone output.
 

@@ -6,7 +6,7 @@ from typing import Any, TypeVar
 from hydra.conf import HydraConf, JobConf, RunDir
 from omegaconf import MISSING
 
-from ir_stress.data.mr_nirp_download import MR_NIRP_DATASET_NAME, MR_NIRP_GDRIVE_FOLDER_ID
+from ir_stress.dataset.mr_nirp_download import MR_NIRP_DATASET_NAME, MR_NIRP_GDRIVE_FOLDER_ID
 
 T = TypeVar("T")
 

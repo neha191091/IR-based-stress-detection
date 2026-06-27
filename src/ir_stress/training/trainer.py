@@ -12,9 +12,9 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from ir_stress.config import TrainConfig, resolve_h5_dir
-from ir_stress.data.dataset import H5ClipDataset
+from ir_stress.dataset.dataset import H5ClipDataset
 from ir_stress.device import device_label, resolve_device, supports_amp
-from ir_stress.data.splits import resolve_h5_splits, save_split_metadata
+from ir_stress.dataset.splits import resolve_h5_splits, save_split_metadata
 from ir_stress.models.model import RppgModel, build_model
 from ir_stress.tracking import ensure_mlflow
 from ir_stress.training.ipr import IrrelevantPowerRatio

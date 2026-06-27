@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 from ir_stress.config import TrainConfig
-from ir_stress.data.synthetic import create_smoke_dataset
+from ir_stress.dataset.synthetic import create_smoke_dataset
 from ir_stress.evaluation.evaluator import evaluate
 from ir_stress.inference.pipeline import run_inference
 from ir_stress.models.model import build_model

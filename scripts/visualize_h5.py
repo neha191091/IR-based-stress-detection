@@ -11,7 +11,7 @@ import numpy as np
 from hydra.core.config_store import ConfigStore
 
 from ir_stress.config import resolve_h5_dir
-from ir_stress.data.base import h5_num_frames, list_h5_paths, read_h5_window
+from ir_stress.dataset.base import h5_num_frames, list_h5_paths, read_h5_window
 from ir_stress.signals.stress_indicators import extract_ibi_with_beat_times
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent

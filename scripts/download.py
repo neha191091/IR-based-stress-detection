@@ -6,7 +6,7 @@ import hydra
 from hydra.core.config_store import ConfigStore
 
 from ir_stress.config import DownloadConfig
-from ir_stress.data.mr_nirp_download import (
+from ir_stress.dataset.mr_nirp_download import (
     MR_NIRP_GDRIVE_URL,
     DownloadOptions,
     download_mr_nirp,

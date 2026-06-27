@@ -6,7 +6,7 @@ import hydra
 from hydra.core.config_store import ConfigStore
 
 from ir_stress.config import PreprocessConfig, h5_dir_for_face_crop_mode
-from ir_stress.data.mr_nirp_driving import MRNIRPDrivingAdapter
+from ir_stress.dataset.mr_nirp_driving import MRNIRPDrivingAdapter
 
 
 @hydra.main(version_base=None, config_path=None, config_name="config")
