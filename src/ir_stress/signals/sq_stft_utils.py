@@ -1,4 +1,14 @@
-"""Synchrosqueezing STFT utilities (ported from IR_iHR / Hau-Tieng Wu)."""
+"""Synchrosqueezing STFT utilities.
+
+Adapted from the IR_iHR reference implementation:
+  https://github.com/natalialmg/IR_iHR
+  (upstream: IR_iHR/synchrosqueezing.py; based on Hau-Tieng Wu's SST code)
+
+Original work: Martinez et al., ICIP 2019.
+
+Included in this codebase but not yet evaluated in our proof of concept
+(see docs/REPORT.md).
+"""
 
 from __future__ import annotations
 
@@ -18,7 +28,10 @@ def SST_STFT(
     Smooth=True,
     Hemi=True,
 ):
-    """Synchrosqueezed short-time Fourier transform."""
+    """Synchrosqueezed short-time Fourier transform.
+
+    Ported from IR_iHR (github.com/natalialmg/IR_iHR).
+    """
     xrow = x.size
     x = np.squeeze(x)
 
@@ -149,7 +162,10 @@ def hermf(N, M, tm):
 
 
 def SST_helper(x, Hz, highFreq, lowFreq, windowLength=377):
-    """Run synchrosqueezing on a 1D signal."""
+    """Run synchrosqueezing on a 1D signal.
+
+    Ported from IR_iHR (github.com/natalialmg/IR_iHR).
+    """
     del Hz  # kept for API compatibility with IR_iHR
     frequency_axis_resolution = 0.001
     h, Dh = hermf(windowLength, 1, 2)

@@ -1,4 +1,11 @@
-"""PyTorch dataset for H5 face video clips."""
+"""PyTorch dataset for H5 face video clips.
+
+Adapted from the Contrast-Phys+ reference implementation:
+  https://github.com/zhaodongsun/contrast-phys/tree/master/contrast-phys%2B
+  (upstream: contrast-phys+/dataset.py)
+
+Original work: Sun & Li, TPAMI 2024.
+"""
 
 import h5py
 import numpy as np

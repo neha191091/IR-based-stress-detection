@@ -1,7 +1,14 @@
 """Core IR_iHR signal extraction (optimal SVD + synchrosqueezing iHR).
 
-Based on N. Martinez et al., ICIP 2019 and the reference implementation:
-https://github.com/natalialmg/IR_iHR
+Adapted from the IR_iHR reference implementation:
+  https://github.com/natalialmg/IR_iHR
+  (upstream: IR_iHR/core.py, synchrosqueezing.py)
+
+Original work: Martinez et al., "Non-Contact Photoplethysmogram and
+Instantaneous Heart Rate Estimation from Infrared Face Video", ICIP 2019.
+
+Included in this codebase but not yet evaluated in our proof of concept
+(see docs/REPORT.md).
 """
 
 from __future__ import annotations
@@ -31,7 +38,10 @@ def butter_highpass_coeffs(highcut: float, fs: float, order: int):
 
 
 def optimal_svd(Y: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Optimal shrinkage SVD (Gavish & Donoho, 2017)."""
+    """Optimal shrinkage SVD (Gavish & Donoho, 2017).
+
+    Ported from IR_iHR (github.com/natalialmg/IR_iHR).
+    """
     U, s, V = np.linalg.svd(Y, full_matrices=False)
     m, n = Y.shape
     beta = m / n
@@ -68,7 +78,10 @@ def optimal_svd(Y: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 def curve_extractor(
     spectrogram: np.ndarray, lamb: float, guess: int | None = None
 ) -> np.ndarray:
-    """Track dominant frequency index over time (Cicone & Wu, 2017)."""
+    """Track dominant frequency index over time (Cicone & Wu, 2017).
+
+    Ported from IR_iHR (github.com/natalialmg/IR_iHR).
+    """
     eps = 1e-8
     E = np.abs(np.asarray(spectrogram)).T
     E /= np.sum(E)
@@ -96,7 +109,10 @@ def quality_process(
     fp_display_low: float = 0.7,
     fp_display_high: float = 5.0,
 ) -> np.ndarray:
-    """Per-channel quality index from synchrosqueezed spectral power."""
+    """Per-channel quality index from synchrosqueezed spectral power.
+
+    Ported from IR_iHR (github.com/natalialmg/IR_iHR).
+    """
     nv = signals.shape[0]
     quality = np.zeros(nv)
     b, a = butter_bandpass_coeffs(f_low, f_high, fs, order=5)
@@ -143,6 +159,8 @@ def extract_ihr_from_grid(
 ) -> IHRExtractionResult:
     """
     Extract a contactless PPG waveform and instantaneous HR from a grid signal matrix.
+
+    Ported from IR_iHR (github.com/natalialmg/IR_iHR).
 
     Parameters
     ----------

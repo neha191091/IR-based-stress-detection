@@ -1,4 +1,11 @@
-"""ST-rPPG head that attaches to a backbone's last feature layer."""
+"""ST-rPPG head that attaches to a backbone's last feature layer.
+
+Adapted from the Contrast-Phys+ reference implementation:
+  https://github.com/zhaodongsun/contrast-phys/tree/master/contrast-phys%2B
+  (upstream: contrast-phys+/model.py)
+
+Original work: Sun & Li, TPAMI 2024.
+"""
 
 import torch
 import torch.nn as nn
@@ -6,7 +13,7 @@ import torch.nn as nn
 
 class STRppgHead(nn.Module):
     """
-    Adaptive spatial pooling and 1x1 conv producing an ST-rPPG block.
+    Adaptive spatial pooling and 1x1 conv producing an ST-rPPG block (Contrast-Phys+).
 
     Output shape: (B, spatial_dim^2 + 1, T) — spatial samples plus spatial mean.
     """

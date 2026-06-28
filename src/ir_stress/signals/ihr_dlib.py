@@ -1,4 +1,13 @@
-"""dlib 68-point face landmarks for IR_iHR grid extraction."""
+"""dlib 68-point face landmarks for IR_iHR grid extraction.
+
+Adapted from the IR_iHR reference implementation:
+  https://github.com/natalialmg/IR_iHR
+
+Original work: Martinez et al., ICIP 2019.
+
+Included in this codebase but not yet evaluated in our proof of concept
+(see docs/REPORT.md).
+"""
 
 from __future__ import annotations
 
@@ -74,6 +83,8 @@ def extract_dlib_landmarks(
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Load differential NIR frames and detect dlib landmarks per frame.
+
+    Ported from IR_iHR (github.com/natalialmg/IR_iHR).
 
     Returns ``video`` with shape ``(H, W, T)`` as float64 in [0, 1] and
     ``landmarks`` with shape ``(68, 2, T)``.

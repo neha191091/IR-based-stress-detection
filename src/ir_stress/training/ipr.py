@@ -1,11 +1,18 @@
-"""Irrelevant power ratio metric from Contrast-Phys+."""
+"""Irrelevant power ratio metric from Contrast-Phys+.
+
+Adapted from the Contrast-Phys+ reference implementation:
+  https://github.com/zhaodongsun/contrast-phys/tree/master/contrast-phys%2B
+  (upstream: contrast-phys+/loss.py)
+
+Original work: Sun & Li, TPAMI 2024.
+"""
 
 import torch
 import torch.nn as nn
 
 
 class IrrelevantPowerRatio(nn.Module):
-    """Ratio of energy outside the physiological band in the predicted rPPG PSD."""
+    """Ratio of energy outside the physiological band in the predicted rPPG PSD (Contrast-Phys+)."""
 
     def __init__(self, fs: float, high_pass: float, low_pass: float):
         super().__init__()

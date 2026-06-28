@@ -1,4 +1,11 @@
-"""PhysNet backbone — encoder/decoder 3D convolutions from Contrast-Phys+."""
+"""PhysNet backbone — encoder/decoder 3D convolutions from Contrast-Phys+.
+
+Adapted from the Contrast-Phys+ reference implementation:
+  https://github.com/zhaodongsun/contrast-phys/tree/master/contrast-phys%2B
+  (upstream: contrast-phys+/model.py)
+
+Original work: Sun & Li, TPAMI 2024.
+"""
 
 import torch
 import torch.nn as nn
@@ -9,7 +16,7 @@ from ir_stress.models.backbone import Backbone
 
 
 class PhysNet(Backbone):
-    """3D CNN encoder/decoder producing (B, 64, T, 8, 8) feature maps."""
+    """3D CNN encoder/decoder producing (B, 64, T, 8, 8) feature maps (Contrast-Phys+)."""
 
     def __init__(self, in_ch: int = 3, grad_checkpoint: bool = False):
         super().__init__()

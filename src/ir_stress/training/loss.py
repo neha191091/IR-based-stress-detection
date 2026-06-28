@@ -1,4 +1,13 @@
-"""Contrast-Phys+ contrastive loss."""
+"""Contrast-Phys+ contrastive loss.
+
+Adapted from the Contrast-Phys+ reference implementation:
+  https://github.com/zhaodongsun/contrast-phys/tree/master/contrast-phys%2B
+  (upstream: contrast-phys+/loss.py)
+
+Original work: Sun & Li, "Contrast-Phys+: Unsupervised and Weakly-supervised
+Video-based Remote Physiological Measurement via Spatiotemporal Contrast",
+TPAMI 2024.
+"""
 
 import torch
 import torch.nn as nn
@@ -6,7 +15,7 @@ import torch.nn.functional as F
 
 
 class CalculateNormPSD(nn.Module):
-    """Normalized power spectral density in the physiological band."""
+    """Normalized power spectral density in the physiological band (Contrast-Phys+)."""
 
     def __init__(self, fs: float, high_pass: float, low_pass: float):
         super().__init__()
@@ -29,7 +38,7 @@ class CalculateNormPSD(nn.Module):
 
 
 class ST_sampling(nn.Module):
-    """Spatiotemporal sampling on an ST-rPPG block."""
+    """Spatiotemporal sampling on an ST-rPPG block (Contrast-Phys+)."""
 
     def __init__(self, delta_t: int, k: int, fs: float, high_pass: float, low_pass: float):
         super().__init__()
@@ -52,7 +61,7 @@ class ST_sampling(nn.Module):
 
 
 class T_sampling(nn.Module):
-    """Temporal sampling on ground-truth PPG signals."""
+    """Temporal sampling on ground-truth PPG signals (Contrast-Phys+)."""
 
     def __init__(self, delta_t: int, k: int, fs: float, high_pass: float, low_pass: float):
         super().__init__()
@@ -77,7 +86,7 @@ class T_sampling(nn.Module):
 
 
 class ContrastLoss(nn.Module):
-    """Spatiotemporal contrastive loss from Contrast-Phys+."""
+    """Spatiotemporal contrastive loss (Contrast-Phys+)."""
 
     def __init__(self, delta_t: int, k: int, fs: float, high_pass: float, low_pass: float):
         super().__init__()

@@ -1,4 +1,13 @@
-"""End-to-end IR_iHR classical signal extraction pipeline."""
+"""End-to-end IR_iHR classical signal extraction pipeline.
+
+Adapted from the IR_iHR reference implementation:
+  https://github.com/natalialmg/IR_iHR
+
+Original work: Martinez et al., ICIP 2019.
+
+Included in this codebase but not yet evaluated in our proof of concept
+(see docs/REPORT.md).
+"""
 
 from __future__ import annotations
 
@@ -25,7 +34,10 @@ def extract_from_grid_matrix(
     *,
     window: int = 301,
 ) -> IHRExtractionResult:
-    """Run the IR_iHR extraction on a precomputed grid signal matrix."""
+    """Run the IR_iHR extraction on a precomputed grid signal matrix.
+
+    Ported from IR_iHR (github.com/natalialmg/IR_iHR).
+    """
     return extract_ihr_from_grid(Y, fs, prior_bpm=prior_bpm, window=window)
 
 
@@ -111,6 +123,8 @@ def run_ihr_inference(
 ) -> dict:
     """
     Extract contactless PPG and instantaneous HR using the IR_iHR method.
+
+    Ported from IR_iHR (github.com/natalialmg/IR_iHR).
 
     Provide either ``input_h5`` (uniform face-crop grid) or ``input_dir`` (raw PGM).
     For raw PGM, ``landmarks_csv`` is optional: when omitted, dlib detects 68-point

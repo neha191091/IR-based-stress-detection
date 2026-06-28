@@ -1,4 +1,11 @@
-"""RppgModel composes a backbone with an ST-rPPG head."""
+"""RppgModel composes a backbone with an ST-rPPG head.
+
+Model composition follows the Contrast-Phys+ reference implementation:
+  https://github.com/zhaodongsun/contrast-phys/tree/master/contrast-phys%2B
+  (upstream: contrast-phys+/model.py)
+
+Original work: Sun & Li, TPAMI 2024.
+"""
 
 import torch
 import torch.nn as nn
@@ -19,7 +26,7 @@ _GRAD_CHECKPOINT_BACKBONES = frozenset({"physnet", "physnet_lite"})
 
 
 class RppgModel(nn.Module):
-    """Full rPPG model: backbone encoder + ST-rPPG head."""
+    """Full rPPG model: backbone encoder + ST-rPPG head (Contrast-Phys+)."""
 
     def __init__(self, backbone: Backbone, head: STRppgHead):
         super().__init__()

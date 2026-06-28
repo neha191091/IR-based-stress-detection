@@ -1,4 +1,14 @@
-"""Face-region grid signal extraction for IR_iHR (adapted from IR_iHR/video_utils.py)."""
+"""Face-region grid signal extraction for IR_iHR.
+
+Adapted from the IR_iHR reference implementation:
+  https://github.com/natalialmg/IR_iHR
+  (upstream: IR_iHR/video_utils.py)
+
+Original work: Martinez et al., ICIP 2019.
+
+Included in this codebase but not yet evaluated in our proof of concept
+(see docs/REPORT.md).
+"""
 
 from __future__ import annotations
 
@@ -48,7 +58,10 @@ def _polygon_mask(shape: tuple[int, int], points: np.ndarray) -> np.ndarray:
 
 
 def _boost_landmarks(landmarks_xy: np.ndarray) -> np.ndarray:
-    """Add synthetic forehead and cheek landmarks (IR_iHR convention)."""
+    """Add synthetic forehead and cheek landmarks (IR_iHR convention).
+
+    Ported from IR_iHR (github.com/natalialmg/IR_iHR).
+    """
     boosted = np.array(landmarks_xy, dtype=np.float64)
     face_length = boosted[:, 1].max() - boosted[:, 1].min()
     forehead = boosted[18:27].copy()
@@ -87,6 +100,8 @@ def grid_signals_from_video(
 ) -> np.ndarray:
     """
     Extract per-grid-cell mean intensity traces from a face video block.
+
+    Ported from IR_iHR (github.com/natalialmg/IR_iHR).
 
     Parameters
     ----------
@@ -194,6 +209,8 @@ def grid_signals_from_pgm(
 ) -> np.ndarray:
     """
     Build the features × time matrix from raw PGM frames.
+
+    Ported from IR_iHR (github.com/natalialmg/IR_iHR).
 
     Uses OpenFace landmarks when ``landmark_csv`` is provided; otherwise detects
     landmarks with dlib (IR_iHR reference behaviour).

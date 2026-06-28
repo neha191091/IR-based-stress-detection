@@ -1,4 +1,11 @@
-"""Contrast-Phys+ training loop with MLflow tracking."""
+"""Contrast-Phys+ training loop with MLflow tracking.
+
+Training procedure adapted from the Contrast-Phys+ reference implementation:
+  https://github.com/zhaodongsun/contrast-phys/tree/master/contrast-phys%2B
+  (upstream: contrast-phys+/train.py)
+
+Original work: Sun & Li, TPAMI 2024.
+"""
 
 import json
 import os
@@ -34,7 +41,7 @@ def train(
     test_list: list[str] | None = None,
 ) -> Path:
     """
-    Train an RppgModel on H5 clips.
+    Train an RppgModel on H5 clips (Contrast-Phys+ protocol).
 
     When train_list/test_list are omitted, splits are derived from config
     (val_subjects). Split metadata is saved to split.json.
