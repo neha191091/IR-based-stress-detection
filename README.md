@@ -2,19 +2,15 @@
 
 Repository: [github.com/neha191091/IR-based-stress-detection](https://github.com/neha191091/IR-based-stress-detection)
 
-Unsupervised rPPG extraction from near-infrared (NIR) video using [Contrast-Phys+](https://github.com/zhaodongsun/contrast-phys/tree/master/contrast-phys%2B), with time-domain HRV stress indicators (Baevsky SI, SDNN, RMSSD, pNN50) from the recovered pulse signal. A classical [IR_iHR](https://github.com/natalialmg/IR_iHR) path (optimal SVD + synchrosqueezing) is also available without a trained model.
+Unsupervised rPPG extraction from near-infrared (NIR) video using [Contrast-Phys+](https://github.com/zhaodongsun/contrast-phys/tree/master/contrast-phys%2B), with time-domain HRV stress indicators (Baevsky SI, SDNN, RMSSD, pNN50) from the recovered pulse signal. A classical [IR_iHR](https://github.com/natalialmg/IR_iHR) path (optimal SVD + synchrosqueezing) is also incoiorporated without evaluation. 
 
-For architecture, evaluation results, and figures, see the **[technical report on GitHub Pages](https://neha191091.github.io/IR-based-stress-detection/REPORT/)** ([source](docs/REPORT.md)), or browse locally with MkDocs:
+**The code in this repository has been adapted from the following repositories**
+| Component | Source | Use in this project |
+|-----------|--------|---------------------|
+| Contrast-Phys+ (PhysNet, ST-rPPG head, contrastive loss) | [zhaodongsun/contrast-phys](https://github.com/zhaodongsun/contrast-phys) | Primary neural rPPG path; trained and evaluated on MR-NIRP |
+| IR_iHR (optimal SVD, synchrosqueezing iHR) | [natalialmg/IR_iHR](https://github.com/natalialmg/IR_iHR) | Ported as optional classical extractor; **not tested or validated** in this report |
 
-```bash
-uv sync --extra docs
-uv run mkdocs serve
-# Open http://127.0.0.1:8000
-```
-
-Build static HTML to `site/` with `uv run mkdocs build`.
-
-After pushing to `main`, GitHub Actions publishes the site to **https://neha191091.github.io/IR-based-stress-detection/** (enable **Settings → Pages → Source: GitHub Actions** on first deploy).
+For architecture, evaluation results, and figures, see the **[technical report on GitHub Pages](https://neha191091.github.io/IR-based-stress-detection/REPORT/)** ([source](docs/REPORT.md)).
 
 ## Overview
 
