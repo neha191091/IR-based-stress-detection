@@ -164,6 +164,8 @@ This report outlines a foundational pipeline for in-cabin driver stress detectio
 | Contrast-Phys+ (PhysNet, ST-rPPG head, contrastive loss) | [zhaodongsun/contrast-phys](https://github.com/zhaodongsun/contrast-phys) | Primary neural rPPG path; trained and evaluated on MR-NIRP |
 | IR_iHR (optimal SVD, synchrosqueezing iHR) | [natalialmg/IR_iHR](https://github.com/natalialmg/IR_iHR) | Ported as optional classical extractor; **not tested or validated** in this report |
 
+Coding assistance tools were used for some parts of the project implementation (e.g. pipeline glue code, refactoring, and setup documentation).
+
 ## References
 
 - [1] Sun & Li, [Contrast-Phys+](https://github.com/zhaodongsun/contrast-phys/tree/master/contrast-phys%2B) (TPAMI 2024) — [reference code](https://github.com/zhaodongsun/contrast-phys)
