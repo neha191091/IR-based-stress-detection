@@ -150,11 +150,17 @@ class InferenceConfig(ModelConfig, HydraConfig):
     """scripts/inference.py — rPPG + Baevsky SI on H5 or raw frames."""
 
     face_crop_mode: str = "yunet"
-    checkpoint: str = MISSING
+    extraction_method: str = "neural"  # "neural" (Contrast-Phys+) or "ihr" (IR_iHR)
+    prior_bpm: float = 70.0
+    ihr_grid_size: int | None = None  # default: 8 for H5, 5 for raw PGM
+    dlib_predictor: str = "data/models/shape_predictor_68_face_landmarks.dat"
+    checkpoint: str | None = None
     input_h5: str | None = None
     input_dir: str | None = None
     landmarks_csv: str | None = None
     output_dir: str = "results/inference"
+    plot: bool = True
+    raw_dir: str = "data/raw/mr-nirp"
 
 
 @dataclass

@@ -12,7 +12,9 @@ from ir_stress.dataset.base import h5_num_frames, iter_h5_imgs_windows
 from ir_stress.dataset.face_crop import FaceCropStream, annotate_bbox, stack_face_window
 from ir_stress.models.model import build_model, RppgModel
 from ir_stress.models.predict import predict_window
+from ir_stress.inference.plot import maybe_save_inference_plot
 from ir_stress.signals.filtering import butter_bandpass
+from ir_stress.signals.ihr_pipeline import run_ihr_inference
 from ir_stress.signals.stress_indicators import baevsky_stress_index, extract_ibi
 
 
@@ -74,6 +76,12 @@ def _write_results(
     fs: int,
     num_frames: int,
     rppg: np.ndarray,
+    *,
+    input_h5: Path | None = None,
+    input_dir: Path | None = None,
+    raw_root: str = "data/raw/mr-nirp",
+    plot: bool = True,
+    plot_title: str = "",
 ) -> dict:
     """Write rPPG array and summary JSON; return result dict."""
     filtered = butter_bandpass(rppg, 0.6, 4.0, fs)
@@ -95,12 +103,29 @@ def _write_results(
     out_path = output_dir / f"{stem}_results.json"
     with open(out_path, "w") as f:
         json.dump(result, f)
+
+    if plot:
+        plot_file = maybe_save_inference_plot(
+            output_dir,
+            stem,
+            rppg,
+            fs,
+            num_frames,
+            input_h5=input_h5,
+            input_dir=input_dir,
+            raw_root=raw_root,
+            title=plot_title,
+            enabled=plot,
+        )
+        if plot_file is not None:
+            result["plot_file"] = plot_file
+
     return result
 
 
 def run_inference(
     config: InferenceConfig | TrainConfig,
-    checkpoint: Path,
+    checkpoint: Path | None,
     output_dir: Path,
     input_h5: Path | None = None,
     input_dir: Path | None = None,
@@ -109,8 +134,28 @@ def run_inference(
     """
     Run rPPG + Baevsky SI on a preprocessed H5 clip or raw PGM frames.
 
-    Provide either ``input_h5`` or both ``input_dir`` and ``landmarks_csv``.
+    Provide either ``input_h5`` or ``input_dir`` (with ``landmarks_csv`` for neural
+    openface mode). IR_iHR raw mode can omit ``landmarks_csv`` to use dlib instead.
+
+    Set ``extraction_method=ihr`` on :class:`InferenceConfig` to use the classical
+    IR_iHR pipeline (no checkpoint required).
     """
+    method = getattr(config, "extraction_method", "neural")
+    if method == "ihr":
+        return run_ihr_inference(
+            config,
+            output_dir,
+            input_h5=input_h5,
+            input_dir=input_dir,
+            landmarks_csv=landmarks_csv,
+            prior_bpm=getattr(config, "prior_bpm", 70.0),
+            grid_size=getattr(config, "ihr_grid_size", None),
+            dlib_predictor=getattr(config, "dlib_predictor", None),
+        )
+
+    if checkpoint is None:
+        raise ValueError("checkpoint is required when extraction_method='neural'")
+
     has_h5 = input_h5 is not None
     has_raw = input_dir is not None and landmarks_csv is not None
     if has_h5 == has_raw:
@@ -120,6 +165,9 @@ def run_inference(
 
     device = resolve_device(getattr(config, "device", None))
     model = _load_model(config, checkpoint, device)
+    plot = getattr(config, "plot", True)
+    raw_root = getattr(config, "raw_dir", "data/raw/mr-nirp")
+    plot_title = f"Inference vs pulse-ox | {checkpoint.parent.name}"
 
     if input_h5 is not None:
         rppg = _predict_h5_clip(
@@ -137,6 +185,10 @@ def run_inference(
             config.fs,
             h5_num_frames(input_h5),
             rppg,
+            input_h5=input_h5,
+            raw_root=raw_root,
+            plot=plot,
+            plot_title=plot_title,
         )
 
     face_crop_mode = getattr(config, "face_crop_mode", "yunet")
@@ -156,4 +208,8 @@ def run_inference(
         config.fs,
         num_frames,
         rppg,
+        input_dir=input_dir,
+        raw_root=raw_root,
+        plot=plot,
+        plot_title=plot_title,
     )

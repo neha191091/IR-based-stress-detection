@@ -1,13 +1,20 @@
 # IR-Based Stress Detection
 
-Unsupervised rPPG extraction from near-infrared (NIR) video using [Contrast-Phys+](https://github.com/zhaodongsun/contrast-phys/tree/master/contrast-phys%2B), with time-domain HRV stress indicators (Baevsky SI, SDNN, RMSSD, pNN50) from the recovered pulse signal.
+Unsupervised rPPG extraction from near-infrared (NIR) video using [Contrast-Phys+](https://github.com/zhaodongsun/contrast-phys/tree/master/contrast-phys%2B), with time-domain HRV stress indicators (Baevsky SI, SDNN, RMSSD, pNN50) from the recovered pulse signal. A classical [IR_iHR](https://github.com/natalialmg/IR_iHR) path (optimal SVD + synchrosqueezing) is also available without a trained model.
 
 ## Overview
 
+Two signal-extraction paths share the same downstream stress metrics:
+
 ```
-NIR video  →  Backbone (PhysNet)  →  ST-rPPG head  →  rPPG signal  →  IBI  →  stress indicators
+Neural (default)                    Classical (IR_iHR)
+─────────────────                   ──────────────────
+NIR video → PhysNet → ST-rPPG head   NIR video → face-region grid → optimal SVD
+         → rPPG waveform                      → synchrosqueezing iHR
+         ↘                                    ↘
+              IBI peak detection → Baevsky SI, SDNN, RMSSD, pNN50
                     ↑
-         MR-NIRP pulse oximeter (PPG ground truth, eval only)
+         MR-NIRP pulse oximeter (PPG ground truth, eval / plots only)
 ```
 
 | Pipeline | Module | Metrics |
@@ -16,15 +23,19 @@ NIR video  →  Backbone (PhysNet)  →  ST-rPPG head  →  rPPG signal  →  IB
 | Preprocess | `ir_stress.dataset.mr_nirp_driving` | — |
 | Train | `ir_stress.training` | MLflow: loss, IPR |
 | Evaluate | `ir_stress.evaluation` | Pearson r, MSE |
-| Inference | `ir_stress.inference` | rPPG, Baevsky SI, HRV |
+| Inference (neural) | `ir_stress.inference` | rPPG, Baevsky SI, HRV |
+| Inference (IR_iHR) | `ir_stress.signals.ihr_pipeline` | rPPG, instantaneous HR, Baevsky SI |
 | Data exploration | `scripts/data_exploration.py` | Windowed stress plots |
+| WESAD visualization | `scripts/visualize_WESAD_stress.py` | Baseline vs stress BVP/ECG plots |
 
 ### End-to-end workflow
 
 ```
 Download MR-NIRP (Google Drive) → download.py → preprocess.py → train.py → evaluate.py
-                                      ↘ inference.py (H5 or raw PGM + landmarks)
+                                      ↘ inference.py extraction_method=neural (H5 or raw PGM + landmarks)
+                                      ↘ inference.py extraction_method=ihr (H5 or raw PGM; dlib landmarks optional)
                                       ↘ data_exploration.py (NIR montage + pulse-ox stress plots)
+                                      ↘ visualize_WESAD_stress.py (WESAD baseline/stress BVP + ECG plots)
 ```
 
 Smoke test (`scripts/smoke_test.py`) uses short **synthetic** clips — not MR-NIRP — to verify the install without the full dataset.
@@ -39,10 +50,19 @@ cd IR-based-stress-detection
 uv sync
 ```
 
-For plotting scripts and notebooks, install the optional matplotlib extra:
+Optional extras:
+
+| Extra | Install | Purpose |
+|-------|---------|---------|
+| `notebook` | `uv sync --extra notebook` | Matplotlib plots (`data_exploration.py`, inference comparison PNGs) |
+| `ihr` | `uv sync --extra ihr` | dlib landmarks for IR_iHR raw-PGM inference |
+
+For IR_iHR on raw PGM without OpenFace CSVs, also download the dlib shape predictor:
 
 ```bash
-uv sync --extra notebook
+uv sync --extra ihr
+# Download http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
+# Extract to data/models/shape_predictor_68_face_landmarks.dat
 ```
 
 Verify the install:
@@ -121,6 +141,22 @@ v1 defaults to **940 nm NIR** (`in_ch=1`, 30 fps). Use `wavelengths=[975]` or `w
 **Note:** `large_motion` clips exist only at **975 nm** in MR-NIRP Car. Filtering `motion_types=large_motion` with `wavelengths=[940]` yields no clips.
 
 **Note:** Subject 2 and Subject 16 are the same person (day vs night recordings). Do not put both in train and test splits.
+
+### WESAD (wearable baseline / stress)
+
+The [WESAD](https://doi.org/10.1145/3242969.3242985) dataset provides synchronised wrist BVP (Empatica E4, 64 Hz), chest ECG (RespiBAN, 700 Hz), and protocol labels in `data/WESAD/S<subject>/S<subject>.pkl`. Subjects S1 and S12 are missing due to sensor malfunction; 15 subjects remain (S2–S11, S13–S17).
+
+Place the extracted dataset at:
+
+```
+data/WESAD/
+  S2/S2.pkl
+  S3/S3.pkl
+  ...
+  wesad_readme.pdf
+```
+
+Each pickle is a dict with keys `subject`, `signal` (`chest`, `wrist`), and `label` (protocol condition sampled at 700 Hz: 1 = baseline, 2 = stress, 3 = amusement, 4 = meditation).
 
 ## Preprocessing
 
@@ -312,12 +348,46 @@ Reports **Pearson correlation** and **MSE** on bandpass-filtered, z-score-normal
 
 ## Inference
 
+Set `extraction_method` to choose the signal path. Both methods write stress metrics and can produce a comparison plot against pulse-ox ground truth when an H5 clip or MR-NIRP raw layout is available.
+
+| Method | Config | Checkpoint | Landmarks (raw PGM) |
+|--------|--------|------------|---------------------|
+| `neural` (default) | `extraction_method=neural` | Required | OpenFace CSV required |
+| `ihr` | `extraction_method=ihr` | Not needed | dlib (default) or OpenFace CSV |
+
+Shared inference parameters (`InferenceConfig`):
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `extraction_method` | `neural` | `neural` or `ihr` |
+| `input_h5` | — | Preprocessed H5 clip (mutually exclusive with `input_dir`) |
+| `input_dir` | — | Directory of raw NIR PGM frames |
+| `landmarks_csv` | — | OpenFace CSV (required for neural raw mode; optional for IR_iHR) |
+| `output_dir` | `results/inference` | Output directory |
+| `plot` | `true` | Write `{stem}_comparison.png` when ground truth is available |
+| `raw_dir` | `data/raw/mr-nirp` | MR-NIRP root used to locate pulse-ox for comparison plots |
+
+Outputs (both methods): `{stem}_results.json`, `{stem}_rppg.npy`, and optionally `{stem}_comparison.png`. IR_iHR also writes `{stem}_ihr_bpm.npy` and `{stem}_ihr_time.npy`.
+
+Set `plot=false` to skip figures. Plots require `uv sync --extra notebook`.
+
+### Neural rPPG (Contrast-Phys+)
+
 From a preprocessed H5 clip:
 
 ```bash
 uv run scripts/inference.py \
   checkpoint=checkpoints/epoch29.pt \
   input_h5=data/h5/subject2_some_clip.h5 \
+  output_dir=results/inference
+```
+
+Model settings (`model`, `face_size`, `face_crop_mode`, …) are read from `config.json` in the checkpoint directory. If the path contains `=` (common for run folder names), quote the override for Hydra and the shell:
+
+```bash
+uv run scripts/inference.py \
+  'checkpoint="checkpoints/facecrop=center_clipsec=5_epochs=30_lr=1e-05_imgsz=128_backbone=physnet_lite/epoch15.pt"' \
+  input_h5=data/h5_yunet/subject1_subject1_driving_still_940.h5 \
   output_dir=results/inference
 ```
 
@@ -331,9 +401,55 @@ uv run scripts/inference.py \
   output_dir=results/inference
 ```
 
-Raw mode crops faces on the fly (one window at a time) using the same logic as preprocessing.
+Raw mode crops faces on the fly (one window at a time) using the same logic as preprocessing. OpenFace landmarks are required for raw neural inference.
 
-Outputs `{stem}_results.json` (summary + Baevsky SI) and `{stem}_rppg.npy` (full waveform).
+### IR_iHR classical extraction
+
+Classical contactless PPG and instantaneous heart rate from spatial grid signals, following Martinez et al. (ICIP 2019) and the [IR_iHR](https://github.com/natalialmg/IR_iHR) reference implementation:
+
+```
+raw PGM / H5 face crops → spatial grid (channels × frames)
+  → highpass → optimal SVD shrinkage → quality-ranked eigenvectors
+  → best cumulative component → bandpass PPG
+  → synchrosqueezing → instantaneous HR (bpm)
+  → IBI → Baevsky SI
+```
+
+**Minimum length:** IR_iHR needs at least **301 frames** (~10 s at 30 fps) for the synchrosqueezing window.
+
+From a preprocessed H5 clip (uniform grid on 128×128 face crops; no landmarks):
+
+```bash
+uv run scripts/inference.py \
+  extraction_method=ihr \
+  input_h5=data/h5/subject2_some_clip.h5 \
+  output_dir=results/ihr
+```
+
+From raw NIR PGM frames with **automatic dlib landmarks** (default for IR_iHR raw mode):
+
+```bash
+uv run scripts/inference.py \
+  extraction_method=ihr \
+  input_dir=data/raw/mr-nirp/Subject1/subject1_driving_still_940/NIR \
+  output_dir=results/ihr
+```
+
+Or with precomputed OpenFace landmarks instead of dlib:
+
+```bash
+uv run scripts/inference.py \
+  extraction_method=ihr \
+  input_dir=data/raw/mr-nirp/Subject1/subject1_driving_still_940/NIR \
+  landmarks_csv=data/landmarks/subject1_driving_still_940.csv \
+  output_dir=results/ihr
+```
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `prior_bpm` | `70.0` | Prior heart rate for IR_iHR eigenvector quality ranking |
+| `ihr_grid_size` | `null` | Grid cell size in pixels (`8` for H5, `5` for raw PGM when unset) |
+| `dlib_predictor` | `data/models/shape_predictor_68_face_landmarks.dat` | dlib 68-point shape model (used when `landmarks_csv` is omitted) |
 
 ## Data exploration
 
@@ -355,6 +471,37 @@ uv run scripts/data_exploration.py subject_number=4 start_time=9.967 window_sec=
 
 Saves `results/subject{N}_exploration.png`: top row shows one differential NIR frame per 10 s stress band; below are windowed stress metrics and PPG.
 
+### WESAD baseline / stress plots
+
+Compare wrist BVP and chest ECG stress indicators side-by-side for baseline and stress protocol windows (requires `uv sync --extra notebook`):
+
+```bash
+# Default: 120 s from each condition, starting at t=0 within the block; all subjects
+uv run scripts/visualize_WESAD_stress.py
+
+# Custom window offset and length
+uv run scripts/visualize_WESAD_stress.py start_time=60 window_sec=120
+```
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `start_time` | `0.0` | Offset (s) into each baseline and stress block; 0 = block start |
+| `window_sec` | `120.0` | Duration (s) extracted from each condition |
+
+For every available subject, the script:
+
+1. Crops `[start_time, start_time + window_sec)` from the first baseline block and the first stress block
+2. Plots them side-by-side (baseline left, stress right), each with its own 0–`window_sec` time axis
+3. Saves `results/wesad_S{id}_baseline_stress_{start}s_{window}s.png`
+
+Each plot contains two columns (baseline | stress):
+
+- Wrist BVP waveform with detected peaks marked
+- Chest ECG waveform with R-peaks marked
+- Windowed stress metrics (10 s sliding windows, 0.5 s hop) from BVP (blue) and ECG (black): mean IBI, SDNN, RMSSD, pNN50, Baevsky SI
+
+IBIs are filtered to 0.35–1.50 s (~40–171 bpm) before metric computation. Subjects where the requested window exceeds a block length are skipped with a message.
+
 Stress metrics are computed in `ir_stress.signals.stress_indicators` from inter-beat intervals (IBIs) extracted via peak detection on the PPG waveform (`extract_ibi`).
 
 ## Stress indicators
@@ -371,7 +518,7 @@ Time-domain metrics live in `src/ir_stress/signals/stress_indicators.py`:
 
 `extract_ibi()` peaks a PPG/rPPG waveform; `stress_indicators()` computes all metrics from an IBI array in seconds.
 
-## Notebooks
+## Notebooks (ARCHIVED)
 
 Explore downloaded clips interactively:
 
@@ -390,20 +537,25 @@ scripts/
   preprocess.py          # raw PGM → H5
   train.py
   evaluate.py
-  inference.py           # H5 or raw PGM + landmarks
+  inference.py           # neural or IR_iHR extraction (H5 or raw PGM)
   data_exploration.py    # NIR montage + windowed stress plots (Hydra)
+  visualize_WESAD_stress.py  # WESAD baseline/stress BVP + ECG plots (Hydra)
+  visualize_h5.py        # H5 clip preview
   smoke_test.py          # synthetic end-to-end check
 
 notebooks/
-  visualize_nir_pulseox.ipynb  # NIR frame montage + PulseOX waveform
+  visualize_nir_pulseox.ipynb  # NIR frame montage + PulseOX waveform (archived)
+
+data/models/
+  shape_predictor_68_face_landmarks.dat  # dlib model (not bundled; see Installation)
 
 src/ir_stress/
   models/       Backbone, STRppgHead, PhysNet, RppgModel
-  dataset/    adapters, face_crop, mr_nirp_download, H5 clips, synthetic
+  dataset/      adapters, face_crop, mr_nirp_download, H5 clips, synthetic
   training/     ContrastLoss, trainer
   evaluation/   Pearson/MSE evaluator
-  inference/    rPPG + stress index pipeline
-  signals/      filtering, metrics, stress_indicators (IBI, Baevsky SI, HRV)
+  inference/    rPPG + stress index pipeline, comparison plots
+  signals/      filtering, metrics, stress_indicators; IR_iHR (ihr_core, ihr_regions, ihr_dlib, ihr_pipeline)
 ```
 
 ## Extending
@@ -412,6 +564,8 @@ src/ir_stress/
 
 **New backbone** — subclass `Backbone`, implement `encode()`, register in `build_model()` in `models/model.py` (see `lejepa.py` stub). The shared `STRppgHead` attaches to the backbone output.
 
+**New extraction method** — implement grid signal extraction in `signals/ihr_regions.py` and wire into `signals/ihr_pipeline.py`, or add a new branch in `inference/pipeline.py`.
+
 ## References
 
 - Sun & Li, [Contrast-Phys+: Unsupervised and Weakly-supervised Video-based Remote Physiological Measurement via Spatiotemporal Contrast](https://github.com/zhaodongsun/contrast-phys/tree/master/contrast-phys%2B), TPAMI 2024
@@ -419,4 +573,6 @@ src/ir_stress/
 - Nowara et al., [Near-Infrared Imaging Photoplethysmography During Driving](https://doi.org/10.1109/TITS.2020.3038317), IEEE TITS 2020
 - [MR-NIRP Dataset](https://computationalimaging.rice.edu/mr-nirp-dataset/)
 - [MR-NIRP Car (Google Drive)](https://drive.google.com/drive/folders/1U3fzIOESmaBAyikGF0cKI2wW3YK8JqCK?usp=sharing)
+- Schmidt et al., [Introducing WESAD, a Multimodal Dataset for Wearable Stress and Affect Detection](https://doi.org/10.1145/3242969.3242985), ICMI 2018
 - Baevsky, [Stress Index](https://www.kubios.com/blog/hrv-analysis-methods/) via HRV inter-beat intervals
+- Martinez et al., [Non-Contact Photoplethysmogram and Instantaneous Heart Rate Estimation from Infrared Face Video](https://github.com/natalialmg/IR_iHR), ICIP 2019

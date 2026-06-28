@@ -37,6 +37,9 @@ include = ["src/ir_stress"]
 notebook = [
     "matplotlib>=3.8",
 ]
+ihr = [
+    "dlib>=19.24",
+]
 
 [tool.uv]
 package = true

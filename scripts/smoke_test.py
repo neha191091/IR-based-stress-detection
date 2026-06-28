@@ -12,10 +12,12 @@ from ir_stress.inference.pipeline import run_inference
 from ir_stress.models.model import build_model
 from ir_stress.signals.stress_indicators import baevsky_stress_index
 from ir_stress.signals.metrics import mse, pearson_r
+from ir_stress.signals.ihr_core import extract_ihr_from_grid
+from ir_stress.signals.ihr_regions import grid_signals_from_face_clip
 from ir_stress.training.trainer import train
 
 SMOKE_FACE_SIZE = 64
-SMOKE_FRAMES = 300  # 10 s at 30 fps — enough for train / eval / infer
+SMOKE_FRAMES = 320  # >301 for IR_iHR window; 10+ s at 30 fps
 SMOKE_CLIPS = 2
 
 
@@ -60,6 +62,37 @@ def test_signals() -> None:
     assert not np.isnan(si["baevsky_si"])
 
 
+def test_ihr_extraction() -> None:
+    """Verify IR_iHR grid extraction on synthetic face crops."""
+    fs = 30
+    hr_hz = 1.2
+    t = np.arange(600) / fs
+    pulse = np.sin(2 * np.pi * hr_hz * t)
+    imgs = np.zeros((600, 64, 64, 1), dtype=np.float32)
+    for row in range(0, 64, 8):
+        for col in range(0, 64, 8):
+            phase = np.random.default_rng(row * 64 + col).uniform(0, 2 * np.pi)
+            imgs[:, row : row + 8, col : col + 8, 0] = pulse[:, np.newaxis, np.newaxis] + phase
+
+    Y = grid_signals_from_face_clip(imgs, grid_size=8)
+    result = extract_ihr_from_grid(Y, fs, prior_bpm=72.0)
+    assert result.ppg.shape[0] == Y.shape[1]
+    assert result.ihr_bpm.shape == result.ihr_time.shape
+    assert 50 < np.nanmean(result.ihr_bpm) < 110
+    assert result.quality > 0
+
+
+def test_ihr_dlib_predictor_missing() -> None:
+    """Verify a clear error when the dlib shape model is absent."""
+    from ir_stress.signals.ihr_dlib import resolve_dlib_predictor
+
+    try:
+        resolve_dlib_predictor("/nonexistent/shape_predictor_68_face_landmarks.dat")
+        raise AssertionError("expected FileNotFoundError")
+    except FileNotFoundError as exc:
+        assert "shape_predictor_68_face_landmarks" in str(exc)
+
+
 def test_train_eval_infer(cfg: TrainConfig) -> None:
     """Run a minimal train → evaluate → infer loop."""
     h5_dir = Path(cfg.h5_dir)
@@ -76,14 +109,27 @@ def test_train_eval_infer(cfg: TrainConfig) -> None:
     assert len(result["ibi"]) > 0
     assert Path(result["rppg_file"]).exists()
 
+    from ir_stress.signals.ihr_pipeline import run_ihr_inference
+
+    ihr_result = run_ihr_inference(
+        cfg, Path("results/smoke_ihr"), input_h5=Path(paths[0]), prior_bpm=72.0
+    )
+    assert ihr_result["extraction_method"] == "ihr"
+    assert Path(ihr_result["rppg_file"]).exists()
+    assert Path(ihr_result["ihr_bpm_file"]).exists()
+
 
 def main() -> None:
     cfg = smoke_config()
-    print("1/3 model forward...", flush=True)
+    print("1/5 model forward...", flush=True)
     test_model_forward()
-    print("2/3 signals...", flush=True)
+    print("2/5 signals...", flush=True)
     test_signals()
-    print("3/3 train / eval / infer...", flush=True)
+    print("3/5 IR_iHR extraction...", flush=True)
+    test_ihr_extraction()
+    print("4/5 dlib predictor check...", flush=True)
+    test_ihr_dlib_predictor_missing()
+    print("5/5 train / eval / infer...", flush=True)
     test_train_eval_infer(cfg)
     print("All smoke tests passed.", flush=True)
 
