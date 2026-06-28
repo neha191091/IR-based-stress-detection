@@ -9,7 +9,7 @@ import numpy as np
 
 from ir_stress.dataset.base import SessionMeta, _ppg_dataset
 from ir_stress.dataset.mr_nirp_driving import MRNIRPDrivingAdapter, _resample_ppg
-from ir_stress.signals.filtering import butter_bandpass
+from ir_stress.signals.filtering import butter_bandpass, normalize
 from ir_stress.signals.stress_indicators import extract_ibi_with_beat_times, stress_indicators
 
 HOP_SEC = 0.5
@@ -60,6 +60,56 @@ def _compute_psd(
     if total > 0:
         psd = psd / total
     return freqs, psd
+
+
+def _pearson_corr(a: np.ndarray, b: np.ndarray) -> float:
+    from scipy.stats import pearsonr
+
+    a = np.reshape(a, -1).astype(np.float64)
+    b = np.reshape(b, -1).astype(np.float64)
+    if len(a) != len(b) or len(a) < 2:
+        return float("nan")
+    if a.std() < 1e-12 or b.std() < 1e-12:
+        return float("nan")
+    r, _ = pearsonr(a, b)
+    return float(r)
+
+
+def _compute_sliding_correlations(
+    gt: np.ndarray,
+    inf: np.ndarray,
+    fs: float,
+    *,
+    window_sec: float,
+    hop_sec: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Pearson r between GT and inferred in sliding windows (time domain and PSD)."""
+    gt = np.reshape(gt, -1).astype(np.float64)
+    inf = np.reshape(inf, -1).astype(np.float64)
+    n = min(len(gt), len(inf))
+    if n < 2:
+        empty = np.array([])
+        return empty, empty, empty
+
+    window_samples = max(2, int(round(window_sec * fs)))
+    hop_samples = max(1, int(round(hop_sec * fs)))
+    time_centers: list[float] = []
+    time_corr: list[float] = []
+    psd_corr: list[float] = []
+
+    for start in range(0, n - window_samples + 1, hop_samples):
+        end = start + window_samples
+        gt_win = gt[start:end]
+        inf_win = inf[start:end]
+        center = (start + end - 1) / (2.0 * fs)
+        time_centers.append(center)
+        time_corr.append(_pearson_corr(normalize(gt_win), normalize(inf_win)))
+        _, gt_psd = _compute_psd(gt_win, fs)
+        _, inf_psd = _compute_psd(inf_win, fs)
+        psd_corr.append(_pearson_corr(gt_psd, inf_psd))
+
+    centers = np.asarray(time_centers)
+    return centers, np.asarray(psd_corr), np.asarray(time_corr)
 
 
 def _parse_session_from_stem(stem: str) -> tuple[int, str] | None:
@@ -186,7 +236,7 @@ def save_inference_comparison_plot(
     hop_sec: float = HOP_SEC,
     stress_window_sec: float = STRESS_WINDOW_SEC,
 ) -> Path:
-    """Save stress-metric rows with ground truth (blue) and inferred (black) overlays."""
+    """Save comparison rows: PSD, windowed correlations, and stress metrics."""
     import matplotlib.pyplot as plt
     from matplotlib.gridspec import GridSpec
 
@@ -239,9 +289,17 @@ def save_inference_comparison_plot(
 
     gt_freqs, gt_psd = _compute_psd(gt, fs)
     inf_freqs, inf_psd = _compute_psd(inf_scaled, fs)
+    corr_t, psd_corr, time_corr = _compute_sliding_correlations(
+        gt,
+        inf_scaled,
+        fs,
+        window_sec=stress_window_sec,
+        hop_sec=hop_sec,
+    )
+    corr_t = corr_t - segment_start
 
     n_metrics = len(STRESS_SERIES)
-    n_rows = n_metrics + 1
+    n_rows = n_metrics + 3
     fig_w = 14.0 * max(duration / 100.0, 1.0)
     fig = plt.figure(figsize=(fig_w, 1.8 * n_rows))
     gs = GridSpec(n_rows, 1, figure=fig, hspace=0.5)
@@ -257,8 +315,30 @@ def save_inference_comparison_plot(
     ax_psd.grid(True, alpha=0.3)
     ax_psd.set_xticklabels([])
 
+    ax_psd_corr = fig.add_subplot(gs[1, 0])
+    ax_psd_corr.set_xlim(0, duration)
+    _shade_stress_windows(ax_psd_corr, duration, stress_window_sec)
+    if len(corr_t) and len(psd_corr):
+        ax_psd_corr.plot(corr_t, psd_corr, linewidth=1.2, color="0.2")
+    ax_psd_corr.set_ylim(-1.05, 1.05)
+    ax_psd_corr.set_ylabel("Pearson r")
+    ax_psd_corr.set_title(f"PSD correlation ({stress_window_sec:.0f} s windows)", fontsize=9, loc="left")
+    ax_psd_corr.grid(True, alpha=0.3)
+    ax_psd_corr.set_xticklabels([])
+
+    ax_time_corr = fig.add_subplot(gs[2, 0])
+    ax_time_corr.set_xlim(0, duration)
+    _shade_stress_windows(ax_time_corr, duration, stress_window_sec)
+    if len(corr_t) and len(time_corr):
+        ax_time_corr.plot(corr_t, time_corr, linewidth=1.2, color="0.2")
+    ax_time_corr.set_ylim(-1.05, 1.05)
+    ax_time_corr.set_ylabel("Pearson r")
+    ax_time_corr.set_title(f"Time-domain correlation ({stress_window_sec:.0f} s windows)", fontsize=9, loc="left")
+    ax_time_corr.grid(True, alpha=0.3)
+    ax_time_corr.set_xticklabels([])
+
     for row, (key, label) in enumerate(STRESS_SERIES):
-        ax = fig.add_subplot(gs[row + 1, 0])
+        ax = fig.add_subplot(gs[row + 3, 0])
         ax.set_xlim(0, duration)
         _shade_stress_windows(ax, duration, stress_window_sec)
 

@@ -109,18 +109,27 @@ Implementation: `src/ir_stress/signals/stress_indicators.py`.
 ## Evaluation
 
 ### NIR to PPG
-Unfortunately, the 3DCNN model was too large to appropriately train on  my local machine, which did not have enough resources. 
+Unfortunately, the 3DCNN model was too large to appropriately train on  my local machine, which did not have adequate compute resources. Several concessions were made - The image, as well as the training clip length had to be downsampled, only 3 subjects were used for training. Furthermore, instead of the recommended OpenFace, Yunet was used for face localization. All of these factors could have resulted in slower loss convergence (see below). 
+
+![loss](images/loss.png)
+
+The model was trained using a contrastive loss - since these use two opposing objectives, they can be rather tricky to train. I noted that the positive loss was not decreasing as well, indicating that signals extracted from the spatio-temporal module for the same video clip may not be resulting in the same output
 
 ### PPG to Stress Indicators
 The Stress metrics calculated from BVP (65 Hz) and ECG (700 Hz) were plotted against ground-truth binary stress levels in the WESAD data to verify how well they indicate *stress*.
 
+![S11](images/wesad_S11_baseline_stress_100s_50s.png)
+![S2](images/wesad_S2_baseline_stress_100s_50s.png)
 
+Preliminary tests showed that stress indicators calculated from ECG matched the GT labels better than those calculated from BVP. The higher signal-to-noise ratio and higher sampling frequency of ECG could be a reason for this.
+
+IR images are typically sampled at even lower frequencies (30 FPS)*This could indicate that that the method could benefit from the extraction of other *
 
 
 ## References
-[1] Sun eta al., Contrast-Phys+ (TPAMI 2024)
-[2] Nowara et al., NIR imaging PPG during driving (IEEE TITS 2020)
-[3] Schmidt et al., WESAD (ICMI 2018)
+- [1] Sun eta al., Contrast-Phys+ (TPAMI 2024)
+- [2] Nowara et al., NIR imaging PPG during driving (IEEE TITS 2020)
+- [3] Schmidt et al., WESAD (ICMI 2018)
 
 ---
 
