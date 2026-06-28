@@ -40,6 +40,12 @@ notebook = [
 ihr = [
     "dlib>=19.24",
 ]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocs-mermaid2-plugin>=1.2",
+    "pymdown-extensions>=10.0",
+]
 
 [tool.uv]
 package = true

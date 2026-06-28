@@ -16,3 +16,4 @@ results/
 .DS_Store
 *.log
 .vscode/
+site/

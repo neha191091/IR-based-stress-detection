@@ -1,6 +1,20 @@
 # IR-Based Stress Detection
 
+Repository: [github.com/neha191091/IR-based-stress-detection](https://github.com/neha191091/IR-based-stress-detection)
+
 Unsupervised rPPG extraction from near-infrared (NIR) video using [Contrast-Phys+](https://github.com/zhaodongsun/contrast-phys/tree/master/contrast-phys%2B), with time-domain HRV stress indicators (Baevsky SI, SDNN, RMSSD, pNN50) from the recovered pulse signal. A classical [IR_iHR](https://github.com/natalialmg/IR_iHR) path (optimal SVD + synchrosqueezing) is also available without a trained model.
+
+For architecture, evaluation results, and figures, see the **[technical report on GitHub Pages](https://neha191091.github.io/IR-based-stress-detection/REPORT/)** ([source](docs/REPORT.md)), or browse locally with MkDocs:
+
+```bash
+uv sync --extra docs
+uv run mkdocs serve
+# Open http://127.0.0.1:8000
+```
+
+Build static HTML to `site/` with `uv run mkdocs build`.
+
+After pushing to `main`, GitHub Actions publishes the site to **https://neha191091.github.io/IR-based-stress-detection/** (enable **Settings → Pages → Source: GitHub Actions** on first deploy).
 
 ## Overview
 
@@ -32,7 +46,7 @@ NIR video → PhysNet → ST-rPPG head   NIR video → face-region grid → opti
 
 ```
 Download MR-NIRP (Google Drive) → download.py → preprocess.py → train.py → evaluate.py
-                                      ↘ inference.py extraction_method=neural (H5 or raw PGM + landmarks)
+                                      ↘ inference.py extraction_method=neural (H5, or raw PGM + landmarks_csv)
                                       ↘ inference.py extraction_method=ihr (H5 or raw PGM; dlib landmarks optional)
                                       ↘ data_exploration.py (NIR montage + pulse-ox stress plots)
                                       ↘ visualize_WESAD_stress.py (WESAD baseline/stress BVP + ECG plots)
@@ -54,7 +68,8 @@ Optional extras:
 
 | Extra | Install | Purpose |
 |-------|---------|---------|
-| `notebook` | `uv sync --extra notebook` | Matplotlib plots (`data_exploration.py`, inference comparison PNGs) |
+| `notebook` | `uv sync --extra notebook` | Matplotlib plots (`data_exploration.py`, `visualize_WESAD_stress.py`, inference comparison PNGs) |
+| `docs` | `uv sync --extra docs` | MkDocs site for the technical report (`mkdocs serve`) |
 | `ihr` | `uv sync --extra ihr` | dlib landmarks for IR_iHR raw-PGM inference |
 
 For IR_iHR on raw PGM without OpenFace CSVs, also download the dlib shape predictor:
@@ -160,33 +175,48 @@ Each pickle is a dict with keys `subject`, `signal` (`chest`, `wrist`), and `lab
 
 ## Preprocessing
 
-Face crops follow the [Contrast-Phys preprocessing](https://github.com/zhaodongsun/contrast-phys/blob/master/preprocessing.py) pipeline. Run [OpenFace](https://github.com/TadasBaltrusaitis/OpenFace) on each clip to obtain landmark CSVs:
+Face crops follow the [Contrast-Phys preprocessing](https://github.com/zhaodongsun/contrast-phys/blob/master/preprocessing.py) layout: detect/crop the face per frame, resize to `face_size`, and write aligned pulse-ox PPG into H5.
+
+**Default: YuNet** (`face_crop_mode=yunet`). Uses the bundled OpenCV YuNet ONNX model (`face_detection_yunet_2023mar.onnx` in the package). No OpenFace or landmark files required.
+
+```bash
+# Defaults: raw_dir=data/raw/mr-nirp, face_crop_mode=yunet → data/h5_yunet/
+uv run scripts/preprocess.py
+
+uv run scripts/preprocess.py raw_dir=data/raw/mr-nirp face_size=128
+```
+
+Output directory is always `data/h5_{face_crop_mode}/` (e.g. `data/h5_yunet`). `preprocess.py` does not accept `h5_dir`; set `h5_dir` on `train.py` / `evaluate.py` only if you need a non-default path.
+
+| `face_crop_mode` | Landmarks | Notes |
+|------------------|-----------|-------|
+| `yunet` (default) | Not required | On-device face detection per frame |
+| `openface` | OpenFace CSV per clip in `landmarks_dir` | Paper-faithful landmark crops |
+| `center` | Not required | Fixed center crop (debug / fallback) |
+
+**Optional: OpenFace landmarks** for `face_crop_mode=openface`:
 
 ```bash
 # Convert PGM sequence to video first, then:
 ./FeatureExtraction -f <video> -out_dir data/landmarks -2Dfp
-```
 
-Preprocess to H5:
-
-```bash
-uv run scripts/preprocess.py
-uv run scripts/preprocess.py raw_dir=data/raw/mr-nirp h5_dir=data/h5 landmarks_dir=data/landmarks
+uv run scripts/preprocess.py face_crop_mode=openface landmarks_dir=data/landmarks
+# → data/h5_openface/
 ```
 
 Each output file contains:
 
-- `imgs` — `[N, 128, 128, 1]` float32 NIR face crops
+- `imgs` — `[N, face_size, face_size, 1]` float32 NIR face crops (default `face_size=128`)
 - `ppg` — `[N]` pulse-oximeter PPG waveform resampled to video fps
 
 ## Training
 
-Training reads **preprocessed H5 clips** from `h5_dir/`. You need **at least two H5 files** (different subjects) before `train.py` will run.
+Training reads **preprocessed H5 clips**. By default `h5_dir` resolves to `data/h5_{face_crop_mode}` (`data/h5_yunet` with default `face_crop_mode=yunet`). You need **at least two H5 files** (different subjects) before `train.py` will run.
 
 ### 1. Preprocess first
 
 ```bash
-uv run scripts/preprocess.py raw_dir=data/raw/mr-nirp h5_dir=data/h5 face_crop_mode=yunet
+uv run scripts/preprocess.py raw_dir=data/raw/mr-nirp
 ```
 
 ### 2. Run training
@@ -297,36 +327,41 @@ uv run scripts/evaluate.py checkpoint=checkpoints/epoch29.pt
 
 ### Key hyperparameters
 
-Defaults live in `ir_stress.config.Config` (overridden via Hydra in `scripts/train.py`):
+Defaults live in `ir_stress.config.TrainConfig` (overridden via Hydra in `scripts/train.py`):
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `model` | `physnet` | Backbone name |
+| `model` | `physnet` | Backbone: `physnet`, `physnet_lite`, or `lejepa` (stub) |
 | `in_ch` | `1` | NIR input channels |
 | `fs` | `30` | Video frame rate (fps) |
-| `clip_seconds` | `10` | Temporal window per batch item (300 frames) |
+| `clip_seconds` | `5` | Temporal window per batch item (150 frames at 30 fps) |
 | `spatial_dim` | `2` | ST-rPPG 2×2 spatial grid (+ mean channel) |
 | `epochs` | `30` | Training epochs |
 | `lr` | `1e-5` | AdamW learning rate |
 | `batch_size` | `2` | **Must be 2** — Contrast-Phys+ contrastive loss needs two clips |
 | `face_size` | `128` | Face crop side length; downscale on load if H5 is larger |
+| `face_crop_mode` | `yunet` | Must match preprocessing (`yunet`, `openface`, `center`) |
 | `label_ratio` | `0.0` | Fraction of clips using GT PPG in loss (0 = unsupervised) |
-| `video_duration_sec` | `60` | Effective clip length for steps/epoch (`iters ≈ video_duration_sec / clip_seconds`) |
+| `video_duration_sec` | `200` | Effective clip length for steps/epoch (`iters ≈ video_duration_sec / clip_seconds`) |
 | `eval_window_sec` | `30` | Evaluation/inference window length |
 | `val_subjects` | `[1]` | Held-out subject IDs (leave-one-out) |
 | `wavelengths` | `[940]` | Clip bands to include |
 | `num_workers` | `0` | DataLoader workers (use 2–4 on GPU) |
 | `device` | `null` (auto) | `cuda`, `cuda:N`, `cpu`, or `mps` |
 | `use_amp` | `true` | Mixed precision on CUDA (set `false` on CPU) |
-| `h5_dir` | `data/h5` | Preprocessed H5 directory |
+| `grad_checkpoint` | `false` | Activation checkpointing in PhysNet / PhysNetLite (saves VRAM) |
+| `micro_batch` | `true` | Forward one clip at a time when `batch_size=2` (saves VRAM) |
+| `h5_dir` | `data/h5_yunet` | Resolved from `face_crop_mode` when unset |
 | `checkpoint_dir` | `checkpoints` | Output directory for weights and run metadata |
 | `mlflow_experiment` | `ir-stress-rppg` | MLflow experiment name |
+
+Use `model=physnet_lite` for a smaller backbone when GPU memory is limited.
 
 Optional: re-preprocess at lower resolution for faster I/O and smaller H5 files:
 
 ```bash
-uv run scripts/preprocess.py face_size=64 h5_dir=data/h5_64
-uv run scripts/train.py h5_dir=data/h5_64 face_size=64 'val_subjects=[11]'
+uv run scripts/preprocess.py face_size=64
+uv run scripts/train.py face_size=64 'val_subjects=[11]'
 ```
 
 Use the same `face_size` at train and eval. Checkpoints trained at `face_size=64` are not interchangeable with `128`.
@@ -352,7 +387,7 @@ Set `extraction_method` to choose the signal path. Both methods write stress met
 
 | Method | Config | Checkpoint | Landmarks (raw PGM) |
 |--------|--------|------------|---------------------|
-| `neural` (default) | `extraction_method=neural` | Required | OpenFace CSV required |
+| `neural` (default) | `extraction_method=neural` | Required | `landmarks_csv` required by CLI; used only when `face_crop_mode=openface` (YuNet crops ignore it) |
 | `ihr` | `extraction_method=ihr` | Not needed | dlib (default) or OpenFace CSV |
 
 Shared inference parameters (`InferenceConfig`):
@@ -362,7 +397,8 @@ Shared inference parameters (`InferenceConfig`):
 | `extraction_method` | `neural` | `neural` or `ihr` |
 | `input_h5` | — | Preprocessed H5 clip (mutually exclusive with `input_dir`) |
 | `input_dir` | — | Directory of raw NIR PGM frames |
-| `landmarks_csv` | — | OpenFace CSV (required for neural raw mode; optional for IR_iHR) |
+| `face_crop_mode` | `yunet` | `yunet`, `openface`, or `center` (read from checkpoint `config.json` for neural H5) |
+| `landmarks_csv` | — | Required for neural raw mode (OpenFace CSV when `face_crop_mode=openface`); optional for IR_iHR |
 | `output_dir` | `results/inference` | Output directory |
 | `plot` | `true` | Write `{stem}_comparison.png` when ground truth is available |
 | `raw_dir` | `data/raw/mr-nirp` | MR-NIRP root used to locate pulse-ox for comparison plots |
@@ -378,7 +414,7 @@ From a preprocessed H5 clip:
 ```bash
 uv run scripts/inference.py \
   checkpoint=checkpoints/epoch29.pt \
-  input_h5=data/h5/subject2_some_clip.h5 \
+  input_h5=data/h5_yunet/subject2_some_clip.h5 \
   output_dir=results/inference
 ```
 
@@ -391,17 +427,27 @@ uv run scripts/inference.py \
   output_dir=results/inference
 ```
 
-Or directly from raw NIR PGM frames + OpenFace landmarks (no H5 required):
+Or directly from raw NIR PGM frames (no H5 required):
 
 ```bash
+# YuNet face crops (landmarks_csv still required by CLI but ignored for cropping)
 uv run scripts/inference.py \
   checkpoint=checkpoints/epoch29.pt \
   input_dir=data/raw/mr-nirp/Subject1/subject1_driving_still_940/NIR \
   landmarks_csv=data/landmarks/subject1_driving_still_940.csv \
+  face_crop_mode=yunet \
+  output_dir=results/inference
+
+# OpenFace landmark crops (landmarks required)
+uv run scripts/inference.py \
+  checkpoint=checkpoints/epoch29.pt \
+  input_dir=data/raw/mr-nirp/Subject1/subject1_driving_still_940/NIR \
+  landmarks_csv=data/landmarks/subject1_driving_still_940.csv \
+  face_crop_mode=openface \
   output_dir=results/inference
 ```
 
-Raw mode crops faces on the fly (one window at a time) using the same logic as preprocessing. OpenFace landmarks are required for raw neural inference.
+Raw mode crops faces on the fly (one window at a time) using the same `face_crop_mode` logic as preprocessing.
 
 ### IR_iHR classical extraction
 
@@ -422,7 +468,7 @@ From a preprocessed H5 clip (uniform grid on 128×128 face crops; no landmarks):
 ```bash
 uv run scripts/inference.py \
   extraction_method=ihr \
-  input_h5=data/h5/subject2_some_clip.h5 \
+  input_h5=data/h5_yunet/subject2_some_clip.h5 \
   output_dir=results/ihr
 ```
 
@@ -518,7 +564,7 @@ Time-domain metrics live in `src/ir_stress/signals/stress_indicators.py`:
 
 `extract_ibi()` peaks a PPG/rPPG waveform; `stress_indicators()` computes all metrics from an IBI array in seconds.
 
-## Notebooks (ARCHIVED)
+## Notebooks
 
 Explore downloaded clips interactively:
 
@@ -527,7 +573,7 @@ uv sync --extra notebook
 uv run jupyter notebook notebooks/visualize_nir_pulseox.ipynb
 ```
 
-The notebook shows a montage of NIR frames and the aligned pulse-ox PPG waveform for a configurable time window. For scripted plots with full stress-indicator panels, use `scripts/data_exploration.py` instead.
+The notebook shows a montage of NIR frames and the aligned pulse-ox PPG waveform for a configurable time window. For scripted plots with full stress-indicator panels, prefer `scripts/data_exploration.py`.
 
 ## Project structure
 
@@ -543,15 +589,26 @@ scripts/
   visualize_h5.py        # H5 clip preview
   smoke_test.py          # synthetic end-to-end check
 
+mkdocs.yml                 # MkDocs config (technical report site)
+
+.github/workflows/
+  docs.yml                 # GitHub Pages deploy on push to main
+
 notebooks/
-  visualize_nir_pulseox.ipynb  # NIR frame montage + PulseOX waveform (archived)
+  visualize_nir_pulseox.ipynb  # NIR frame montage + PulseOX waveform
+
+docs/
+  index.md                     # MkDocs landing page
+  REPORT.md                    # Technical report (architecture, evaluation, figures)
+  images/                      # Figures referenced by the report
+  javascripts/mathjax.js       # MathJax config for MkDocs
 
 data/models/
   shape_predictor_68_face_landmarks.dat  # dlib model (not bundled; see Installation)
 
 src/ir_stress/
-  models/       Backbone, STRppgHead, PhysNet, RppgModel
-  dataset/      adapters, face_crop, mr_nirp_download, H5 clips, synthetic
+  models/       Backbone, STRppgHead, PhysNet, PhysNetLite, RppgModel
+  dataset/      adapters, face_crop (YuNet/OpenFace/center), mr_nirp_download, H5 clips, synthetic
   training/     ContrastLoss, trainer
   evaluation/   Pearson/MSE evaluator
   inference/    rPPG + stress index pipeline, comparison plots
@@ -566,13 +623,20 @@ src/ir_stress/
 
 **New extraction method** — implement grid signal extraction in `signals/ihr_regions.py` and wire into `signals/ihr_pipeline.py`, or add a new branch in `inference/pipeline.py`.
 
+## Acknowledgements
+
+Neural rPPG training and inference follow the [Contrast-Phys / Contrast-Phys+](https://github.com/zhaodongsun/contrast-phys) reference implementation (Sun & Li, TPAMI 2024). This repository adapts their PhysNet backbone, ST-rPPG head, contrastive loss, and preprocessing layout for NIR in-cabin video.
+
+The classical IR_iHR extraction path is ported from the [IR_iHR](https://github.com/natalialmg/IR_iHR) reference code (Martinez et al., ICIP 2019). See `src/ir_stress/signals/ihr_*.py` and `scripts/inference.py` (`extraction_method=ihr`).
+
 ## References
 
-- Sun & Li, [Contrast-Phys+: Unsupervised and Weakly-supervised Video-based Remote Physiological Measurement via Spatiotemporal Contrast](https://github.com/zhaodongsun/contrast-phys/tree/master/contrast-phys%2B), TPAMI 2024
-- Sun & Li, [Contrast-Phys](https://github.com/zhaodongsun/contrast-phys), ECCV 2022
+- Sun & Li, [Contrast-Phys+](https://github.com/zhaodongsun/contrast-phys/tree/master/contrast-phys%2B) — reference code for neural rPPG (TPAMI 2024)
+- Sun & Li, [Contrast-Phys](https://github.com/zhaodongsun/contrast-phys) (ECCV 2022)
+- Martinez et al., [IR_iHR](https://github.com/natalialmg/IR_iHR) — reference code for classical IR iHR extraction (ICIP 2019)
 - Nowara et al., [Near-Infrared Imaging Photoplethysmography During Driving](https://doi.org/10.1109/TITS.2020.3038317), IEEE TITS 2020
 - [MR-NIRP Dataset](https://computationalimaging.rice.edu/mr-nirp-dataset/)
 - [MR-NIRP Car (Google Drive)](https://drive.google.com/drive/folders/1U3fzIOESmaBAyikGF0cKI2wW3YK8JqCK?usp=sharing)
 - Schmidt et al., [Introducing WESAD, a Multimodal Dataset for Wearable Stress and Affect Detection](https://doi.org/10.1145/3242969.3242985), ICMI 2018
 - Baevsky, [Stress Index](https://www.kubios.com/blog/hrv-analysis-methods/) via HRV inter-beat intervals
-- Martinez et al., [Non-Contact Photoplethysmogram and Instantaneous Heart Rate Estimation from Infrared Face Video](https://github.com/natalialmg/IR_iHR), ICIP 2019
+- Martinez et al., [Non-Contact Photoplethysmogram and Instantaneous Heart Rate Estimation from Infrared Face Video](https://doi.org/10.1109/ICIP.2019.8802932), ICIP 2019

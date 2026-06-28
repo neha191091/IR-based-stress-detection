@@ -1,5 +1,7 @@
 # In-Cabin Driver Stress Detection — Technical Report
 
+**Repository:** [github.com/neha191091/IR-based-stress-detection](https://github.com/neha191091/IR-based-stress-detection) · **Documentation:** [GitHub Pages](https://neha191091.github.io/IR-based-stress-detection/REPORT/)
+
 ## Problem Formulation
 
 - **Goal**: Detect driver stress **in real time** from a single dashboard-mounted **NIR camera** without access to any proprietary data.
@@ -19,7 +21,9 @@
 
 Classical methods using handcrafted features are often not robust to the above challenges - since they depend on accurate ROI detection, and supervised approaches require the ground truth PPG signal. 
 
-The approach chosen for this project is therefore Contrast-Phys+, proposed in 2024 by Sun et al [1].
+The approach chosen for this project is therefore Contrast-Phys+, proposed in 2024 by Sun et al [1]. The neural training and inference code in this repository is adapted from the official [Contrast-Phys / Contrast-Phys+ implementation](https://github.com/zhaodongsun/contrast-phys).
+
+An alternative **classical** rPPG path based on [IR_iHR](https://github.com/natalialmg/IR_iHR) [4] is also included in the codebase (`src/ir_stress/signals/ihr_*.py`, `extraction_method=ihr` in `scripts/inference.py`). It has **not been evaluated** in this proof of concept — all NIR-to-PPG results below use the Contrast-Phys+ neural pipeline only.
 
 ### Solution Architecture
 
@@ -153,9 +157,16 @@ This report outlines a foundational pipeline for in-cabin driver stress detectio
 
 **Conclusion.** The framework is viable in principle: the downstream metric layer is well supported by literature and demonstrated on WESAD, and the upstream rPPG path produces usable pulse traces under favorable conditions. The main engineering risk remains rPPG fidelity under real driving constraints — motion, low IR contrast, and face-tracking quality — which limited generalization in this PoC. A production system would need more compute for full-resolution Contrast-Phys+ training, robust face tracking (e.g. OpenFace), larger subject coverage, and likely fusion with complementary cues or weak supervision for calibrated stress scoring.
 
-## References
-- [1] Sun eta al., Contrast-Phys+ (TPAMI 2024)
-- [2] Nowara et al., NIR imaging PPG during driving (IEEE TITS 2020)
-- [3] Schmidt et al., WESAD (ICMI 2018)
+## Code credits
 
----
+| Component | Source | Use in this project |
+|-----------|--------|---------------------|
+| Contrast-Phys+ (PhysNet, ST-rPPG head, contrastive loss) | [zhaodongsun/contrast-phys](https://github.com/zhaodongsun/contrast-phys) | Primary neural rPPG path; trained and evaluated on MR-NIRP |
+| IR_iHR (optimal SVD, synchrosqueezing iHR) | [natalialmg/IR_iHR](https://github.com/natalialmg/IR_iHR) | Ported as optional classical extractor; **not tested or validated** in this report |
+
+## References
+
+- [1] Sun & Li, [Contrast-Phys+](https://github.com/zhaodongsun/contrast-phys/tree/master/contrast-phys%2B) (TPAMI 2024) — [reference code](https://github.com/zhaodongsun/contrast-phys)
+- [2] Nowara et al., [NIR imaging PPG during driving](https://doi.org/10.1109/TITS.2020.3038317) (IEEE TITS 2020)
+- [3] Schmidt et al., [WESAD](https://doi.org/10.1145/3242969.3242985) (ICMI 2018)
+- [4] Martinez et al., [IR_iHR](https://github.com/natalialmg/IR_iHR) (ICIP 2019) — [reference code](https://github.com/natalialmg/IR_iHR); included in this repository but not evaluated here
